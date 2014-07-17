@@ -1,5 +1,5 @@
 {
     "servicenow_user": "username",
     "servicenow_password": "secret",
-    "api_root_url": "https://servicenow.example.com/api/now/"
+    "api_root_url": "https://127.0.0.1/api/now/v1"
 }

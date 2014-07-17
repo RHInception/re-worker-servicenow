@@ -86,7 +86,8 @@ class TestServiceNowWorker(TestCase):
         with nested(
                 mock.patch('pika.SelectConnection'),
                 mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
-                mock.patch('replugin.servicenowworker.ServiceNowWorker.send')):
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
 
             worker = servicenowworker.ServiceNowWorker(
                 MQ_CONF,
@@ -115,14 +116,19 @@ class TestServiceNowWorker(TestCase):
             assert self.app_logger.error.call_count == 1
             assert worker.send.call_args[0][2]['status'] == 'failed'
 
-    def test_does_change_record_exist(self):
+    def test_does_change_record_exist_return_properly_on_missing_record(self):
         """
-        Verifies checking for change records results in the proper responses.
+        does_change_record_exist should return false if the API returns a 404
         """
         with nested(
                 mock.patch('pika.SelectConnection'),
                 mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
-                mock.patch('replugin.servicenowworker.ServiceNowWorker.send')):
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
+
+            http_response = requests.Response()
+            http_response.status_code = 404
+            get.return_value = http_response
 
             worker = servicenowworker.ServiceNowWorker(
                 MQ_CONF,
@@ -150,7 +156,93 @@ class TestServiceNowWorker(TestCase):
 
             assert self.app_logger.error.call_count == 0
             assert worker.send.call_args[0][2]['status'] == 'completed'
-            assert worker.send.call_args[0][2]['data'] == {'exists': True}
+            assert worker.send.call_args[0][2]['data']['exists'] is False
+
+    def test_does_change_record_exist_fails_on_non_200_404_response(self):
+        """
+        does_change_record_exist should fail if the api returns non 200/404
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
+
+            http_response = requests.Response()
+            http_response.status_code = 400
+            get.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "does_change_record_exist",
+                    "change_record": "0000"
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'
+
+    def test_does_change_record_exist(self):
+        """
+        Verifies checking for change records results in the proper responses.
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
+
+            http_response = requests.Response()
+            http_response.status_code = 200
+            http_response.json = lambda: {
+                u'result': [{
+                    u'number': u'0000'}]}
+            get.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "does_change_record_exist",
+                    "change_record": "0000"
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 0
+            assert worker.send.call_args[0][2]['status'] == 'completed'
+            assert worker.send.call_args[0][2]['data']['exists'] is True
 
     def test_does_change_record_exist_requires_change_record(self):
         """
@@ -160,7 +252,8 @@ class TestServiceNowWorker(TestCase):
         with nested(
                 mock.patch('pika.SelectConnection'),
                 mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
-                mock.patch('replugin.servicenowworker.ServiceNowWorker.send')):
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
 
             worker = servicenowworker.ServiceNowWorker(
                 MQ_CONF,

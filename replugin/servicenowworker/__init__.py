@@ -17,6 +17,9 @@
 ServiceNow worker.
 """
 import os
+import requests
+
+from urllib import quote_plus
 
 from reworker.worker import Worker
 
@@ -50,14 +53,31 @@ class ServiceNowWorker(Worker):
 
         output.info('Checking for change record %s ...' % expected_record)
 
-        # TODO: make service now call here
-        change_record = expected_record
-        if change_record is not None:
-            output.info('Found change record %s' % change_record)
-            return {'status': 'completed', 'data': {'exists': True}}
+        # Service now call
+        url = self._config['api_root_url'] + '/table/change_request'
+        url += '?sysparm_query=%s&sysparm_fields=number&sysparm_limit=2' % (
+            quote_plus('number=' + expected_record))
 
-        output.info('Change record %s does not exist.' % change_record)
-        return {'status': 'completed', 'data': {'exists': False}}
+        response = requests.get(
+            url,
+            auth=(
+                self._config['servicenow_user'],
+                self._config['servicenow_password']),
+            headers={'Accept': 'application/json'})
+
+        # We should get a 200, else it doesn't exist or server issue
+        if response.status_code == 200:
+            change_record = response.json()['result'][0]['number']
+            if change_record == expected_record:
+                output.info('Found change record %s' % change_record)
+                return {'status': 'completed', 'data': {'exists': True}}
+        # 404 means it can't be found
+        elif response.status_code == 404:
+            output.info('Change record %s does not exist.' % expected_record)
+            return {'status': 'completed', 'data': {'exists': False}}
+        # Anything else is an error
+        raise ServiceNowWorkerError('API returned %s instead of 200' % (
+            response.status_code))
 
     def process(self, channel, basic_deliver, properties, body, output):
         """

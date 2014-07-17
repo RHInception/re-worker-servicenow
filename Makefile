@@ -38,7 +38,7 @@ virtualenv:
 	@echo "# Creating a virtualenv"
 	@echo "#############################################"
 	virtualenv $(NAME)env
-	# There is nothing from requirements.txt we need (until reworker is in pypi).
+	. $(NAME)env/bin/activate && pip install -r requirements.txt
 	. $(NAME)env/bin/activate && pip install pep8 nose coverage mock
 	# If there are any special things to install do it here
 	. $(NAME)env/bin/activate && pip install git+https://github.com/RHInception/re-worker.git

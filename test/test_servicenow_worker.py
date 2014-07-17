@@ -18,6 +18,7 @@ Unittests.
 
 import pika
 import mock
+import requests
 
 from contextlib import nested
 
@@ -78,6 +79,42 @@ class TestServiceNowWorker(TestCase):
         self.app_logger.reset_mock()
         self.connection.reset_mock()
 
+    def test_bad_subcommand(self):
+        """
+        If a bad subcommand is sent the worker should fail.
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send')):
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "this is not a thing",
+                    "change_record": "0000"
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'
+
     def test_does_change_record_exist(self):
         """
         Verifies checking for change records results in the proper responses.
@@ -96,6 +133,11 @@ class TestServiceNowWorker(TestCase):
             worker._on_channel_open(self.channel)
 
             body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "does_change_record_exist",
+                    "change_record": "0000"
+                }
             }
 
             # Execute the call
@@ -107,3 +149,41 @@ class TestServiceNowWorker(TestCase):
                 self.logger)
 
             assert self.app_logger.error.call_count == 0
+            assert worker.send.call_args[0][2]['status'] == 'completed'
+            assert worker.send.call_args[0][2]['data'] == {'exists': True}
+
+    def test_does_change_record_exist_requires_change_record(self):
+        """
+        If no change_record is given to does_change_record exist it should
+        fail
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send')):
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "does_change_record_exist",
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'

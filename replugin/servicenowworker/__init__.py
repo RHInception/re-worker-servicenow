@@ -43,10 +43,10 @@ class ServiceNowWorker(Worker):
         """
         Subcommand which checks to see if a change record exists.
 
-        *Parameters Requires*:
+        *Dynamic Parameters Requires*:
             * change_record: the record to look for.
         """
-        expected_record = body['parameters'].get('change_record', None)
+        expected_record = body.get('dynamic', {}).get('change_record', None)
         if not expected_record:
             raise ServiceNowWorkerError(
                 'No change_record to search for given.')

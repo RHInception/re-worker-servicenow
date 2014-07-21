@@ -101,7 +101,9 @@ class TestServiceNowWorker(TestCase):
                 "parameters": {
                     "command": "servicenow",
                     "subcommand": "this is not a thing",
-                    "change_record": "0000"
+                },
+                "dynamic": {
+                    "change_record": "0000",
                 }
             }
 
@@ -142,7 +144,9 @@ class TestServiceNowWorker(TestCase):
                 "parameters": {
                     "command": "servicenow",
                     "subcommand": "DoesChangeRecordExist",
-                    "change_record": "0000"
+                },
+                "dynamic": {
+                    "change_record": "0000",
                 }
             }
 
@@ -184,7 +188,9 @@ class TestServiceNowWorker(TestCase):
                 "parameters": {
                     "command": "servicenow",
                     "subcommand": "DoesChangeRecordExist",
-                    "change_record": "0000"
+                },
+                "dynamic": {
+                    "change_record": "0000",
                 }
             }
 
@@ -228,7 +234,9 @@ class TestServiceNowWorker(TestCase):
                 "parameters": {
                     "command": "servicenow",
                     "subcommand": "DoesChangeRecordExist",
-                    "change_record": "0000"
+                },
+                "dynamic": {
+                    "change_record": "0000",
                 }
             }
 

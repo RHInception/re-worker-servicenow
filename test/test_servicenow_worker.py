@@ -99,7 +99,8 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "this is not a thing",
+                    "command": "servicenow",
+                    "subcommand": "this is not a thing",
                     "change_record": "0000"
                 }
             }
@@ -139,7 +140,8 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "DoesChangeRecordExist",
+                    "command": "servicenow",
+                    "subcommand": "DoesChangeRecordExist",
                     "change_record": "0000"
                 }
             }
@@ -180,7 +182,8 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "DoesChangeRecordExist",
+                    "command": "servicenow",
+                    "subcommand": "DoesChangeRecordExist",
                     "change_record": "0000"
                 }
             }
@@ -223,7 +226,8 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "DoesChangeRecordExist",
+                    "command": "servicenow",
+                    "subcommand": "DoesChangeRecordExist",
                     "change_record": "0000"
                 }
             }
@@ -261,7 +265,8 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "DoesChangeRecordExist",
+                    "command": "servicenow",
+                    "subcommand": "DoesChangeRecordExist",
                 }
             }
 

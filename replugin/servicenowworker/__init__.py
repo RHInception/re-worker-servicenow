@@ -36,8 +36,8 @@ class ServiceNowWorker(Worker):
     Worker which provides basic functionality with ServiceNow change records.
     """
 
-    #: All allowed commands
-    commands = ('DoesChangeRecordExist', )
+    #: All allowed subcommands
+    subcommands = ('DoesChangeRecordExist', )
 
     def does_change_record_exist(self, body, output):
         """
@@ -84,7 +84,7 @@ class ServiceNowWorker(Worker):
         Writes out output messages from the bus.
 
         *Keys Requires*:
-            * command: the command to execute.
+            * subcommand: the subcommand to execute.
         """
         # Ack the original message
         self.ack(basic_deliver)
@@ -92,23 +92,23 @@ class ServiceNowWorker(Worker):
 
         try:
             try:
-                command = str(body['parameters']['command'])
-                if command not in self.commands:
+                subcommand = str(body['parameters']['subcommand'])
+                if subcommand not in self.subcommands:
                     raise KeyError()
             except KeyError:
                 raise ServiceNowWorkerError(
-                    'No valid command given. Nothing to do!')
+                    'No valid subcommand given. Nothing to do!')
 
-            if command == 'DoesChangeRecordExist':
+            if subcommand == 'DoesChangeRecordExist':
                 self.app_logger.info(
-                    'Executing command %s for correlation_id %s' % (
-                        command, corr_id))
+                    'Executing subcommand %s for correlation_id %s' % (
+                        subcommand, corr_id))
                 result = self.does_change_record_exist(body, output)
             else:
                 self.app_logger.warn(
-                    'Could not the implementation of command %s' % (
-                        command))
-                raise ServiceNowWorkerError('No command implementation')
+                    'Could not the implementation of subcommand %s' % (
+                        subcommand))
+                raise ServiceNowWorkerError('No subcommand implementation')
 
             # Send results back
             self.send(
@@ -122,7 +122,7 @@ class ServiceNowWorker(Worker):
             self.notify(
                 'ServiceNowWorker Executed Successfully',
                 'ServiceNowWorker successfully executed %s. See logs.' % (
-                    command),
+                    subcommand),
                 'completed',
                 corr_id)
 
@@ -130,7 +130,7 @@ class ServiceNowWorker(Worker):
             self.app_logger.info(
                 'ServiceNowWorker successfully executed %s for '
                 'correlation_id %s. See logs.' % (
-                    command, corr_id))
+                    subcommand, corr_id))
 
         except ServiceNowWorkerError, fwe:
             # If a ServiceNowWorkerError happens send a failure log it.

@@ -79,9 +79,9 @@ class TestServiceNowWorker(TestCase):
         self.app_logger.reset_mock()
         self.connection.reset_mock()
 
-    def test_bad_subcommand(self):
+    def test_bad_command(self):
         """
-        If a bad subcommand is sent the worker should fail.
+        If a bad command is sent the worker should fail.
         """
         with nested(
                 mock.patch('pika.SelectConnection'),
@@ -99,8 +99,7 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "servicenow",
-                    "subcommand": "this is not a thing",
+                    "command": "this is not a thing",
                     "change_record": "0000"
                 }
             }
@@ -140,8 +139,7 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "servicenow",
-                    "subcommand": "does_change_record_exist",
+                    "command": "DoesChangeRecordExist",
                     "change_record": "0000"
                 }
             }
@@ -182,8 +180,7 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "servicenow",
-                    "subcommand": "does_change_record_exist",
+                    "command": "DoesChangeRecordExist",
                     "change_record": "0000"
                 }
             }
@@ -226,8 +223,7 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "servicenow",
-                    "subcommand": "does_change_record_exist",
+                    "command": "DoesChangeRecordExist",
                     "change_record": "0000"
                 }
             }
@@ -265,8 +261,7 @@ class TestServiceNowWorker(TestCase):
 
             body = {
                 "parameters": {
-                    "command": "servicenow",
-                    "subcommand": "does_change_record_exist",
+                    "command": "DoesChangeRecordExist",
                 }
             }
 

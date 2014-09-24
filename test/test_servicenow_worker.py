@@ -288,3 +288,170 @@ class TestServiceNowWorker(TestCase):
 
             assert self.app_logger.error.call_count == 1
             assert worker.send.call_args[0][2]['status'] == 'failed'
+    # ---
+
+    def test_update_time(self):
+        """
+        Verify we can update a start time.
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get'),
+                mock.patch('requests.put')) as (_, _, _, get, put):
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            get_response = requests.Response()
+            get_response.status_code = 200
+            get_response.json = lambda: {
+                u'result': [{
+                    u'number': '000000',
+                    u'sys_id': u'0000'}]}
+            get.return_value = get_response
+
+            put_response = requests.Response()
+            put_response.status_code = 200
+            put_response.json = lambda: {
+                u'result': [{
+                    u'sys_id': u'1234567890'}]}
+            put.return_value = put_response
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "UpdateStartTime",
+                },
+                "dynamic": {
+                    "environment": "qa",
+                    "change_record": "0000",
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 0
+            assert worker.send.call_args[0][2]['status'] == 'completed'
+            assert 'u_qa_start_time' in worker.send.call_args[0][2]['data'].keys()
+
+    def test_update_time_server_id_failure(self):
+        """
+        Verify that missing sys_id object returns proper failure for update_time.
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get'),
+                mock.patch('requests.put')) as (_, _, _, get, put):
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            get_response = requests.Response()
+            get_response.status_code = 200
+            get_response.json = lambda: {
+                u'result': [{
+                    u'number': u'0000',
+                    u'sys_id': u'0000'}]}
+            get.return_value = get_response
+
+            put_response = requests.Response()
+            put_response.status_code = 404
+            put_response.json = lambda: {
+                u'error': [{
+                    u'message': u'message here'}]}
+            put.return_value = put_response
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "UpdateStartTime",
+                },
+                "dynamic": {
+                    "environment": "qa",
+                    "change_record": "0000",
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'
+
+    def test_update_time_missing_dynamic_data_failure(self):
+        """
+        Verify that missing dynamic data returns proper failure for update_time.
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send')) as (
+                    _, _, _):
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "UpdateStartTime",
+                },
+                "dynamic": {
+                    "change_record": "0000",
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'
+
+            # Execute the call again with but this time without change_recorda
+            del body['dynamic']['change_record']
+            body['dynamic']['environment'] = 'qa'
+            self.app_logger.error.reset_mock()
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'

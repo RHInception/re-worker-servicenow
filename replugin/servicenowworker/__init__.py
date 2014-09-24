@@ -156,7 +156,7 @@ class ServiceNowWorker(Worker):
             # Return success if we have a 200, else fall into the
             # "Anything else is an error" below
             if response.status_code == 200:
-                return {'status': 'completed', 'data': {key: value}}
+                return {'status': 'completed'}
 
         output.error('Could not update timing due to missing change record')
         # Anything else is an error

@@ -19,6 +19,7 @@ Unittests.
 import pika
 import mock
 import requests
+import datetime
 
 from contextlib import nested
 
@@ -26,6 +27,25 @@ from . import TestCase
 
 from replugin import servicenowworker
 
+# Abridged config for payload tests
+WORKER_CONF = {
+    "change_record_payload": {
+        "u_change_location": "0503586769dd3000df63506980241089",
+        "u_assignment_group": "f3b9bd00d0000000ec0be80b207ce954",
+        "u_end_date": None,
+        "u_change_plan": "Frobnicate all the things",
+        "u_backout_plan": "Frob them back again",
+        "u_short_description": "Test the Megafrobber Enterprise Suite",
+        "u_start_date": None
+    },
+    "start_date_diff": {
+        "days": 7
+    },
+    "end_date_diff": {
+        "days": 7,
+        "hours": 8
+    }
+}
 
 MQ_CONF = {
     'server': '127.0.0.1',
@@ -35,6 +55,7 @@ MQ_CONF = {
     'password': 'guest',
 }
 
+NOW = datetime.datetime.now()
 
 class TestServiceNowWorker(TestCase):
 
@@ -455,3 +476,148 @@ class TestServiceNowWorker(TestCase):
 
             assert self.app_logger.error.call_count == 1
             assert worker.send.call_args[0][2]['status'] == 'failed'
+
+    def test__make_start_end_dates(self):
+        """We can calculate start/end dates for changes
+
+Expected results from method:
+
+- u_start_date = now + start_diff
+- u_end_date = now + end_diff
+"""
+        start_diff = {
+            'days': 5
+        }
+        end_diff = {
+            'days': 10
+        }
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('replugin.servicenowworker.datetime.datetime')) as (
+                    _, _, _, dt):
+
+            dt.now.return_value = NOW
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            diffs = worker._make_start_end_dates(start_diff, end_diff)
+            self.assertEqual(
+                diffs['u_start_date'],
+                (NOW + datetime.timedelta(**start_diff)).strftime('%Y-%m-%d %H:%M:%S'))
+            self.assertEqual(
+                diffs['u_end_date'],
+                (NOW + datetime.timedelta(**end_diff)).strftime('%Y-%m-%d %H:%M:%S'))
+
+            # Now do the reverse, but swap the start/end dates so we
+            # catch invalid date ranges
+            with self.assertRaises(servicenowworker.ServiceNowWorkerError):
+                worker._make_start_end_dates(end_diff, start_diff)
+
+
+    def test_create_change_record(self):
+        """We can create change records, and notice failures"""
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.post')) as (
+                    _, _, _, post):
+
+            result = {'import_set': 'ISET0011337',
+                           'result': [
+                               {'display_name': 'number',
+                                'display_value': 'CHG0007331',
+                                'record_link': 'https://example.service-now.com/api/now/table/change_request/d6e68a52fd5f31ff296db3236d1f6bfb',
+                                'status': 'inserted',
+                                'sys_id': 'd6e68a52fd5f31ff296db3236d1f6bfb',
+                                'table': 'change_request',
+                                'transform_map': 'Auto Transform Change Map'}
+                           ],
+                 'staging_table': 'u_test_change_creation'
+            }
+
+            http_response = requests.Response()
+            http_response.status_code = 201
+            http_response.json = lambda: result
+            post.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+            (chg, url) = worker.create_change_record(worker._config)
+
+            self.assertEqual(chg, 'CHG0007331')
+            self.assertEqual(url, 'https://example.service-now.com/api/now/table/change_request/d6e68a52fd5f31ff296db3236d1f6bfb')
+
+            # Catch unauthorized requests
+            with self.assertRaises(servicenowworker.ServiceNowWorkerError):
+                http_response.status_code = 403
+                (chg, url) = worker.create_change_record(worker._config)
+
+            # catch 'wtf?' requests
+            with self.assertRaises(servicenowworker.ServiceNowWorkerError):
+                http_response.status_code = 500
+                (chg, url) = worker.create_change_record(worker._config)
+
+    def test_does_change_record_exist_auto_create_if_missing(self):
+        """
+        We call the auto-create method if a change record doesn't exist
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.create_change_record'),
+                mock.patch('requests.get')) as (_, _, _, create_record, get):
+
+            http_response = requests.Response()
+            http_response.status_code = 404
+            get.return_value = http_response
+            create_record.return_value = ('CHG1337', 'http://example.servicenow.com/foobar')
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "DoesChangeRecordExist",
+                },
+                "dynamic": {
+                    "change_record": "0000",
+                }
+            }
+
+            # Enable auto-create
+            worker._config['auto_create_change_if_missing'] = True
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            self.assertEqual(self.app_logger.error.call_count, 0)
+            self.assertEqual(worker.send.call_args[0][2]['status'], 'completed')
+            self.assertFalse(worker.send.call_args[0][2]['data']['exists'])
+            self.assertEqual(worker.send.call_args[0][2]['data']['new_record'], 'CHG1337')
+            self.assertEqual(worker.send.call_args[0][2]['data']['new_record_url'], 'http://example.servicenow.com/foobar')
+            create_record.assert_called_once()

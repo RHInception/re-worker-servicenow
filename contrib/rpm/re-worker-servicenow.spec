@@ -9,7 +9,7 @@
 
 Name: re-worker-servicenow
 Summary: ServiceNow worker for Release Engine
-Version: 0.0.2
+Version: 0.0.3
 Release: 1%{?dist}
 
 Group: Applications/System
@@ -42,6 +42,9 @@ access.
 
 
 %changelog
+* Mon Nov 17 2014 Tim Bielawa <tbielawa@redhat.com> - 0.0.3-1
+- Now with automatic change record creation, if you're into that sort of thing
+
 * Wed Sep 24 2014 Steve Milner <stevem@gnulinux.net> - 0.0.2-1
 - Now can update custom environment start/end dates.
 * Thu Jul 17 2014 Steve Milner <stevem@gnulinux.net> - 0.0.1-1

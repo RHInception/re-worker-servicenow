@@ -1,5 +1,24 @@
 {
     "servicenow_user": "username",
     "servicenow_password": "secret",
-    "api_root_url": "https://127.0.0.1/api/now/v1"
+    "api_root_url": "https://127.0.0.1/api/now/v1",
+    "api_import_url": "https://127.0.0.1/api/now/v1/import/u_test_change_creation",
+    "auto_create_change_if_missing": false,
+    "change_record_payload":
+    {
+        "u_change_location": "0503586769dd3000df63506980241089",
+        "u_assignment_group": "f3b9bd00d0000000ec0be80b207ce954",
+        "u_end_date": null,
+        "u_change_plan": "Frobnicate all the things",
+        "u_backout_plan": "Frob them back again",
+        "u_short_description": "Test the Megafrobber Enterprise Suite",
+        "u_start_date": null
+    },
+    "start_date_diff": {
+        "days": 7
+    },
+    "end_date_diff": {
+        "days": 7,
+        "hours": 8
+    }
 }

@@ -617,7 +617,7 @@ Expected results from method:
 
             self.assertEqual(self.app_logger.error.call_count, 0)
             self.assertEqual(worker.send.call_args[0][2]['status'], 'completed')
-            self.assertFalse(worker.send.call_args[0][2]['data']['exists'])
+            self.assertTrue(worker.send.call_args[0][2]['data']['exists'])
             self.assertEqual(worker.send.call_args[0][2]['data']['new_record'], 'CHG1337')
             self.assertEqual(worker.send.call_args[0][2]['data']['new_record_url'], 'http://example.servicenow.com/foobar')
             create_record.assert_called_once()

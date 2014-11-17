@@ -108,7 +108,7 @@ class ServiceNowWorker(Worker):
                 (chg, url) = self.create_change_record(self._config)
                 output.info('Created change %s' % str(chg))
                 _data = {
-                    'exists': False,
+                    'exists': True,
                     'new_record': str(chg),
                     'new_record_url': str(url)
                 }

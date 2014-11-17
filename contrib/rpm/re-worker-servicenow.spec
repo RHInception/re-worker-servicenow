@@ -10,7 +10,7 @@
 Name: re-worker-servicenow
 Summary: ServiceNow worker for Release Engine
 Version: 0.0.3
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 Group: Applications/System
 License: AGPLv3
@@ -42,6 +42,9 @@ access.
 
 
 %changelog
+* Mon Nov 17 2014 Tim Bielawa <tbielawa@redhat.com> - 0.0.3-2
+- Return 'exists' as True if auto-creation succeeds
+
 * Mon Nov 17 2014 Tim Bielawa <tbielawa@redhat.com> - 0.0.3-1
 - Now with automatic change record creation, if you're into that sort of thing
 

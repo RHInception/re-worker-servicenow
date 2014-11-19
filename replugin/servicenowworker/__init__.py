@@ -168,12 +168,13 @@ class ServiceNowWorker(Worker):
             # "Anything else is an error" below
             if response.status_code == 200:
                 return {'status': 'completed'}
+            else:
+                raise ServiceNowWorkerError('API returned %s instead of 200' % (
+                    response.status_code))
 
-        output.error('Could not update timing due to missing change record')
         # Anything else is an error
-        raise ServiceNowWorkerError('API returned %s instead of 200' % (
-            response.status_code))
-    # ---
+        output.error('Could not update timing due to missing change record')
+        raise ServiceNowWorkerError('Could not update timing due to missing change record')
 
     def create_change_record(self, config):
         """

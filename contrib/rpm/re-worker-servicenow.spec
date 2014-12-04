@@ -10,7 +10,7 @@
 Name: re-worker-servicenow
 Summary: ServiceNow worker for Release Engine
 Version: 0.0.3
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 Group: Applications/System
 License: AGPLv3
@@ -42,6 +42,9 @@ access.
 
 
 %changelog
+* Thu Dec  4 2014 Tim Bielawa <tbielawa@redhat.com> - 0.0.3-4
+- Emit 'start' messages once running
+
 * Wed Nov 19 2014 Tim Bielawa <tbielawa@redhat.com> - 0.0.3-3
 - Fix logic in start/end time update method
 

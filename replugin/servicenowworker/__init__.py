@@ -296,6 +296,22 @@ Returns a serialized dictionary representing the JSON payload for our POST """
         self.ack(basic_deliver)
         corr_id = str(properties.correlation_id)
 
+        self.send(
+            properties.reply_to,
+            corr_id,
+            {'status': 'started'},
+            exchange=''
+        )
+
+        self.notify(
+            "Servicenow Worker starting",
+            "servicenow Worker starting",
+            'started',
+            corr_id
+        )
+
+        output.info("Starting now")
+
         try:
             try:
                 subcommand = str(body['parameters']['subcommand'])

@@ -9,8 +9,8 @@
 
 Name: re-worker-servicenow
 Summary: ServiceNow worker for Release Engine
-Version: 0.0.3
-Release: 4%{?dist}
+Version: 0.0.4
+Release: 1%{?dist}
 
 Group: Applications/System
 License: AGPLv3
@@ -42,6 +42,9 @@ access.
 
 
 %changelog
+* Thu Jan  8 2015 Steve Milner <stevem@gnulinux.net> - 0.0.4-1
+- Now can query and create CTasks.
+
 * Thu Dec  4 2014 Tim Bielawa <tbielawa@redhat.com> - 0.0.3-4
 - Emit 'start' messages once running
 
@@ -56,5 +59,6 @@ access.
 
 * Wed Sep 24 2014 Steve Milner <stevem@gnulinux.net> - 0.0.2-1
 - Now can update custom environment start/end dates.
+
 * Thu Jul 17 2014 Steve Milner <stevem@gnulinux.net> - 0.0.1-1
 - Initial spec

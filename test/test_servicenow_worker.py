@@ -690,7 +690,6 @@ Expected results from method:
             with self.assertRaises(servicenowworker.ServiceNowWorkerError):
                 worker._make_start_end_dates(end_diff, start_diff)
 
-
     def test_create_change_record(self):
         """We can create change records, and notice failures"""
         with nested(
@@ -791,3 +790,162 @@ Expected results from method:
             self.assertEqual(worker.send.call_args[0][2]['data']['new_record'], 'CHG1337')
             self.assertEqual(worker.send.call_args[0][2]['data']['new_record_url'], 'http://example.servicenow.com/foobar')
             create_record.assert_called_once()
+
+    def test_create_c_task(self):
+        """We can create ctasks"""
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.post')) as (
+                    _, _, _, post):
+
+            result = {
+                'result': {
+                    'number': 'CTASK0001234',
+                    'change_request': {
+                        'link': 'http://127.0.0.1/'
+                    }
+                }
+            }
+
+            http_response = requests.Response()
+            http_response.status_code = 201
+            http_response.json = lambda: result
+            post.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "CreateCTask",
+                },
+                "dynamic": {
+                    "change_record": "0000",
+                    "ctask_description": "data stuff"
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 0
+            assert worker.send.call_args[0][2]['status'] == 'completed'
+
+    def test_create_c_task_fails_properly_on_unknown_response(self):
+        """We can understand the failure of ctask creation on unknwon response"""
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.post')) as (
+                    _, _, _, post):
+
+            result = {
+                'result': {
+                    'number': 'CTASK0001234',
+                    'change_request': {
+                        'link': 'http://127.0.0.1/'
+                    }
+                }
+            }
+
+            http_response = requests.Response()
+            http_response.status_code = 500
+            http_response.json = lambda: result
+            post.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "CreateCTask",
+                },
+                "dynamic": {
+                    "change_record": "0000",
+                    "ctask_description": "data stuff"
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'
+
+    def test_create_c_task_fails_properly_on_bad_auth_response(self):
+        """We can understand the failure of ctask creation on bad auth response"""
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.post')) as (
+                    _, _, _, post):
+
+            result = {
+                'result': {
+                    'number': 'CTASK0001234',
+                    'change_request': {
+                        'link': 'http://127.0.0.1/'
+                    }
+                }
+            }
+
+            http_response = requests.Response()
+            http_response.status_code = 403
+            http_response.json = lambda: result
+            post.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "CreateCTask",
+                },
+                "dynamic": {
+                    "change_record": "0000",
+                    "ctask_description": "data stuff"
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'

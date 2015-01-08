@@ -301,26 +301,33 @@ class ServiceNowWorker(Worker):
                 CODE=response.status_code,
                 ERR_MSG=response.text)
             )
-    '''
-    def create_c_task(self, config):
+
+    def create_c_task(self, body, output):
         """
-        Create a new CTask. Adds a record to the import table
-        which is later processed by transformation maps.
+        Create a new CTask.
         """
-        url = config['api_import_url']
+        output.info("Attempting to create a new CTask ...")
+        change_record = body.get('dynamic', {}).get('change_record', None)
+        if not change_record:
+            raise ServiceNowWorkerError(
+                'No change_record given for CTask creation.')
+
+        url = self._config['api_root_url'] + '/table/change_task'
+
         auth = (
-            config['servicenow_user'],
-            config['servicenow_password']
+            self._config['servicenow_user'],
+            self._config['servicenow_password']
         )
         headers = {
             'content-type': 'application/json',
             'Accept': 'application/json'
         }
 
-        # Process the change record template into a handy-dandy string
-        # to send in the API POST call
-        # TODO
-        payload = self._do_change_template(config)
+        payload = self._config['c_task_payload'].copy()
+        payload['change_request'] = change_record
+        if body.get('dynamic', {}).get('ctask_description', None):
+            payload['short_description'] = body['dynamic']['ctask_description']
+        payload['description'] = payload['short_description']
 
         response = requests.post(
             url,
@@ -329,10 +336,9 @@ class ServiceNowWorker(Worker):
             auth=auth)
 
         if response.status_code == 201:
-            result = response.json()['result'][0]
-            change_record = result['display_value']
-            ctask = result['ctask'] # TODO???
-            change_url = result['record_link']
+            result = response.json()['result']
+            ctask = result['number']
+            change_url = result['change_request']['link']
 
             self.app_logger.info(
                 "CTask {CTASK} created for CHG {CHG_NUM}: {CHG_URL}".format(
@@ -340,27 +346,27 @@ class ServiceNowWorker(Worker):
                     CHG_NUM=change_record,
                     CHG_URL=change_url)
             )
-            return (ctask, change_url)
+
+            output.info("Created CTask {0}".format(ctask))
+            return {'status': 'completed', 'data': {'ctask': ctask}}
 
         elif response.status_code == 403:
-            self.app_logger.info("Service Now API account unauthorized to create change record")
+            self.app_logger.info("Service Now API account unauthorized to create CTask")
             raise ServiceNowWorkerError(
-                "403 unauthorized response when creating change record: {ERR_MSG}".format(
+                "403 unauthorized response when creating CTask: {ERR_MSG}".format(
                     ERR_MSG=response.text)
             )
 
         else:
-            self.app_logger.info("Unexpected response [{CODE}] when creating change record {ERR_MSG}".format(
+            self.app_logger.info("Unexpected response [{CODE}] when creating CTask {ERR_MSG}".format(
                 CODE=response.status_code,
                 ERR_MSG=response.text)
             )
-            raise ServiceNowWorkerError("Unexpected response [{CODE}] when creating change record {ERR_MSG}".format(
+            raise ServiceNowWorkerError("Unexpected response [{CODE}] when creating CTask {ERR_MSG}".format(
                 CODE=response.status_code,
                 ERR_MSG=response.text)
             )
 
-    #---
-    '''
     # Skip covering this, it mostly calls the date method (below)
     def _do_change_template(self, config):  # pragma: no cover
         """Processes a change record payload template. Makes a fresh copy

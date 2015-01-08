@@ -27,7 +27,7 @@ except ImportError:
 
 setup(
     name='reworkerservicenow',
-    version='0.0.3',
+    version='0.0.4',
     description='',
     author='See AUTHORS file',
     author_email='inception@redhat.com',

@@ -119,7 +119,6 @@ class ServiceNowWorker(Worker):
         raise ServiceNowWorkerError('api returned %s instead of 200' % (
             response.status_code))
 
-    # ----
     def does_c_task_exist(self, body, output):
         """
         Subcommand which checks to see if a c task exists.
@@ -132,6 +131,10 @@ class ServiceNowWorker(Worker):
         if not expected_record:
             raise ServiceNowWorkerError(
                 'No ctask to search for given.')
+        change_record = body.get('dynamic', {}).get('change_record', None)
+        if not change_record:
+            raise ServiceNowWorkerError(
+                'No change_record to search for given.')
 
         output.info('Checking for CTask %s ...' % expected_record)
 
@@ -155,26 +158,24 @@ class ServiceNowWorker(Worker):
         # 404 means it can't be found
         elif response.status_code == 404:
             output.info('ctask record %s does not exist.' % expected_record)
-            # TODO
-            '''
-            if self._config.get('auto_create_ctask_if_missing', False):
+            if self._config.get('auto_create_c_task_if_missing', False):
                 output.info('Automatically creating a ctask record')
-                (ctask, url) = self.create_ctask_record(self._config)
-                output.info('Created ctask %s' % str(chg))
+                body['dynamic']['change_record'] = change_record
+                result = self.create_c_task(body, output)
+                new_ctask = str(result['data']['ctask'])
+
+                output.info('Created ctask %s' % new_ctask)
                 _data = {
                     'exists': True,
-                    'new_record': str(chg),
-                    'new_record_url': str(url)
+                    'new_ctask': new_ctask,
                 }
                 return {'status': 'completed', 'data': _data}
             else:
-            '''
-            return {'status': 'completed', 'data': {'exists': False}}
+                return {'status': 'completed', 'data': {'exists': False}}
 
         # anything else is an error
         raise ServiceNowWorkerError('api returned %s instead of 200' % (
             response.status_code))
-    # ----
 
     def update_time(self, body, output, kind):
         """
@@ -324,6 +325,7 @@ class ServiceNowWorker(Worker):
         }
 
         payload = self._config['c_task_payload'].copy()
+
         payload['change_request'] = change_record
         if body.get('dynamic', {}).get('ctask_description', None):
             payload['short_description'] = body['dynamic']['ctask_description']
@@ -339,7 +341,6 @@ class ServiceNowWorker(Worker):
             result = response.json()['result']
             ctask = result['number']
             change_url = result['change_request']['link']
-
             self.app_logger.info(
                 "CTask {CTASK} created for CHG {CHG_NUM}: {CHG_URL}".format(
                     CTASK=ctask,

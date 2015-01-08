@@ -20,6 +20,7 @@
         "days": 7,
         "hours": 8
     },
+    "auto_create_c_task_if_missing": false,
     "c_task_payload": {
         "change_request": null,
         "priority": 3,

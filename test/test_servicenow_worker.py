@@ -226,6 +226,68 @@ class TestServiceNowWorker(TestCase):
             assert self.app_logger.error.call_count == 1
             assert worker.send.call_args[0][2]['status'] == 'failed'
 
+    def test_does_c_task_exist_will_autocreate_if_configured_to_on_404(self):
+        """
+        does_c_task_exist should autocreate a ctask if configued to on 404.
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get'),
+                mock.patch('requests.post')) as (_, _, _, get, post):
+
+            http_response = requests.Response()
+            http_response.status_code = 404
+            get.return_value = http_response
+
+            post_result = {
+                'result': {
+                    'number': 'CTASK0001234',
+                    'change_request': {
+                        'link': 'http://127.0.0.1/'
+                    }
+                }
+            }
+
+            post_response = requests.Response()
+            post_response.status_code = 201
+            post_response.json = lambda: post_result
+            post.return_value = post_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._config['auto_create_c_task_if_missing'] = True
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "DoesCTaskExist",
+                },
+                "dynamic": {
+                    "change_record": "0000",
+                    "ctask": "CTASK0001234"
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert post.call_count == 1  # This is the ctask creation call
+            assert self.app_logger.error.call_count == 0
+            assert worker.send.call_args[0][2]['status'] == 'completed'
+
+
     def test_does_change_record_exist(self):
         """
         Verifies checking for change records results in the proper responses.
@@ -340,6 +402,7 @@ class TestServiceNowWorker(TestCase):
                 },
                 "dynamic": {
                     "ctask": "CTASK0001234",
+                    "change_record": "0000",
                 }
             }
 
@@ -387,6 +450,7 @@ class TestServiceNowWorker(TestCase):
                 },
                 "dynamic": {
                     "ctask": "CTASK0001234",
+                    "change_record": "0000",
                 }
             }
 
@@ -430,7 +494,8 @@ class TestServiceNowWorker(TestCase):
                     "subcommand": "DoesCTaskExist",
                 },
                 "dynamic": {
-                    "change_record": "CTASK0001234",
+                    "ctask": "CTASK0001234",
+                    "change_record": "0000",
                 }
             }
 
@@ -447,7 +512,7 @@ class TestServiceNowWorker(TestCase):
 
     def test_does_c_task_exist_requires_change_record(self):
         """
-        If no ctask is given to does_change_record exist it should fail """
+        If no ctask is given to does_ctask_record exist it should fail """
         with nested(
                 mock.patch('pika.SelectConnection'),
                 mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
@@ -466,6 +531,9 @@ class TestServiceNowWorker(TestCase):
                 "parameters": {
                     "command": "servicenow",
                     "subcommand": "DoesCTaskExist",
+                },
+                "dynamic": {
+                    "change_record": "0000",
                 }
             }
 

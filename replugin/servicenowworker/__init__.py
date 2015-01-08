@@ -41,7 +41,7 @@ class ServiceNowWorker(Worker):
     #: All allowed subcommands
     subcommands = (
         'DoesChangeRecordExist', 'UpdateStartTime',
-        'UpdateEndTime', 'CreateChangeRecord')
+        'UpdateEndTime', 'CreateChangeRecord', 'DoesCTaskExist', 'CreateCTask')
 
     def _get_crq_ids(self, crq):
         """
@@ -118,6 +118,63 @@ class ServiceNowWorker(Worker):
         # anything else is an error
         raise ServiceNowWorkerError('api returned %s instead of 200' % (
             response.status_code))
+
+    # ----
+    def does_c_task_exist(self, body, output):
+        """
+        Subcommand which checks to see if a c task exists.
+
+        *Dynamic Parameters Requires*:
+            * change_record: the record to look for.
+        """
+        # TODO: Use _get_crq_ids
+        expected_record = body.get('dynamic', {}).get('ctask', None)
+        if not expected_record:
+            raise ServiceNowWorkerError(
+                'No ctask to search for given.')
+
+        output.info('Checking for CTask %s ...' % expected_record)
+
+        # service now call
+        url = self._config['api_root_url'] + '/table/change_task/'
+        url += quote_plus(expected_record)
+
+        response = requests.get(
+            url,
+            auth=(
+                self._config['servicenow_user'],
+                self._config['servicenow_password']),
+            headers={'Accept': 'application/json'})
+
+        # we should get a 200, else it doesn't exist or server issue
+        if response.status_code == 200:
+            ctask_record = response.json()['result'][0]['number']
+            if ctask_record == expected_record:
+                output.info('found CTask record %s' % ctask_record)
+                return {'status': 'completed', 'data': {'exists': True}}
+        # 404 means it can't be found
+        elif response.status_code == 404:
+            output.info('ctask record %s does not exist.' % expected_record)
+            # TODO
+            '''
+            if self._config.get('auto_create_ctask_if_missing', False):
+                output.info('Automatically creating a ctask record')
+                (ctask, url) = self.create_ctask_record(self._config)
+                output.info('Created ctask %s' % str(chg))
+                _data = {
+                    'exists': True,
+                    'new_record': str(chg),
+                    'new_record_url': str(url)
+                }
+                return {'status': 'completed', 'data': _data}
+            else:
+            '''
+            return {'status': 'completed', 'data': {'exists': False}}
+
+        # anything else is an error
+        raise ServiceNowWorkerError('api returned %s instead of 200' % (
+            response.status_code))
+    # ----
 
     def update_time(self, body, output, kind):
         """
@@ -244,7 +301,66 @@ class ServiceNowWorker(Worker):
                 CODE=response.status_code,
                 ERR_MSG=response.text)
             )
+    '''
+    def create_c_task(self, config):
+        """
+        Create a new CTask. Adds a record to the import table
+        which is later processed by transformation maps.
+        """
+        url = config['api_import_url']
+        auth = (
+            config['servicenow_user'],
+            config['servicenow_password']
+        )
+        headers = {
+            'content-type': 'application/json',
+            'Accept': 'application/json'
+        }
 
+        # Process the change record template into a handy-dandy string
+        # to send in the API POST call
+        # TODO
+        payload = self._do_change_template(config)
+
+        response = requests.post(
+            url,
+            data=payload,
+            headers=headers,
+            auth=auth)
+
+        if response.status_code == 201:
+            result = response.json()['result'][0]
+            change_record = result['display_value']
+            ctask = result['ctask'] # TODO???
+            change_url = result['record_link']
+
+            self.app_logger.info(
+                "CTask {CTASK} created for CHG {CHG_NUM}: {CHG_URL}".format(
+                    CTASK=ctask,
+                    CHG_NUM=change_record,
+                    CHG_URL=change_url)
+            )
+            return (ctask, change_url)
+
+        elif response.status_code == 403:
+            self.app_logger.info("Service Now API account unauthorized to create change record")
+            raise ServiceNowWorkerError(
+                "403 unauthorized response when creating change record: {ERR_MSG}".format(
+                    ERR_MSG=response.text)
+            )
+
+        else:
+            self.app_logger.info("Unexpected response [{CODE}] when creating change record {ERR_MSG}".format(
+                CODE=response.status_code,
+                ERR_MSG=response.text)
+            )
+            raise ServiceNowWorkerError("Unexpected response [{CODE}] when creating change record {ERR_MSG}".format(
+                CODE=response.status_code,
+                ERR_MSG=response.text)
+            )
+
+    #---
+    '''
     # Skip covering this, it mostly calls the date method (below)
     def _do_change_template(self, config):  # pragma: no cover
         """Processes a change record payload template. Makes a fresh copy
@@ -341,6 +457,16 @@ Returns a serialized dictionary representing the JSON payload for our POST """
                     'Executing subcommand %s for correlation_id %s' % (
                         subcommand, corr_id))
                 result = self.create_change_record(self._config, output)
+            elif subcommand == 'CreateCTask':
+                self.app_logger.info(
+                    'Executing subcommand %s for correlation_id %s' % (
+                        subcommand, corr_id))
+                result = self.create_c_task(body, output)
+            elif subcommand == 'DoesCTaskExist':
+                self.app_logger.info(
+                    'Executing subcommand %s for correlation_id %s' % (
+                        subcommand, corr_id))
+                result = self.does_c_task_exist(body, output)
             else:
                 self.app_logger.warn(
                     'Could not the implementation of subcommand %s' % (

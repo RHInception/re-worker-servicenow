@@ -311,6 +311,176 @@ class TestServiceNowWorker(TestCase):
             assert worker.send.call_args[0][2]['status'] == 'failed'
     # ---
 
+    def test_does_c_task_exist_return_properly_on_missing_record(self):
+        """
+        does_c_task_record_exist should return false if the API returns a 404
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
+
+            http_response = requests.Response()
+            http_response.status_code = 404
+            get.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "DoesCTaskExist",
+                },
+                "dynamic": {
+                    "ctask": "CTASK0001234",
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 0
+            assert worker.send.call_args[0][2]['status'] == 'completed'
+            assert worker.send.call_args[0][2]['data']['exists'] is False
+
+    def test_does_c_task_exist(self):
+        """
+        Verifies checking for ctask records results in the proper responses.
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
+
+            http_response = requests.Response()
+            http_response.status_code = 200
+            http_response.json = lambda: {
+                u'result': [{
+                    u'number': u'CTASK0001234'}]}
+            get.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "DoesCTaskExist",
+                },
+                "dynamic": {
+                    "ctask": "CTASK0001234",
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 0
+            assert worker.send.call_args[0][2]['status'] == 'completed'
+            assert worker.send.call_args[0][2]['data']['exists'] is True
+
+    def test_does_c_task_exist_fails_on_non_200_404_response(self):
+        """
+        does_c_task_exist should fail if the api returns non 200/404
+        """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
+
+            http_response = requests.Response()
+            http_response.status_code = 400
+            get.return_value = http_response
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "DoesCTaskExist",
+                },
+                "dynamic": {
+                    "change_record": "CTASK0001234",
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'
+
+    def test_does_c_task_exist_requires_change_record(self):
+        """
+        If no ctask is given to does_change_record exist it should fail """
+        with nested(
+                mock.patch('pika.SelectConnection'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.notify'),
+                mock.patch('replugin.servicenowworker.ServiceNowWorker.send'),
+                mock.patch('requests.get')) as (_, _, _, get):
+
+            worker = servicenowworker.ServiceNowWorker(
+                MQ_CONF,
+                logger=self.app_logger,
+                config_file='conf/example.json')
+
+            worker._on_open(self.connection)
+            worker._on_channel_open(self.channel)
+
+            body = {
+                "parameters": {
+                    "command": "servicenow",
+                    "subcommand": "DoesCTaskExist",
+                }
+            }
+
+            # Execute the call
+            worker.process(
+                self.channel,
+                self.basic_deliver,
+                self.properties,
+                body,
+                self.logger)
+
+            assert self.app_logger.error.call_count == 1
+            assert worker.send.call_args[0][2]['status'] == 'failed'
+    # ---
+
     def test_update_time(self):
         """
         Verify we can update a start time.

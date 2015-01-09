@@ -139,8 +139,11 @@ class ServiceNowWorker(Worker):
         output.info('Checking for CTask %s ...' % expected_record)
 
         # service now call
-        url = self._config['api_root_url'] + '/table/change_task/'
-        url += quote_plus(expected_record)
+        url = self._config['api_root_url'] + '/table/change_task'
+        url += '?sysparm_limit=1&sysparm_query=%s' % (
+            quote_plus('number=' + expected_record))
+
+        self.app_logger.info('Checking for CTask at %s' % url)
 
         response = requests.get(
             url,
@@ -333,7 +336,7 @@ class ServiceNowWorker(Worker):
 
         response = requests.post(
             url,
-            data=payload,
+            data=json.dumps(payload),
             headers=headers,
             auth=auth)
 

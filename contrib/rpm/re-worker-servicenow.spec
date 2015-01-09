@@ -10,7 +10,7 @@
 Name: re-worker-servicenow
 Summary: ServiceNow worker for Release Engine
 Version: 0.0.4
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 Group: Applications/System
 License: AGPLv3
@@ -42,6 +42,10 @@ access.
 
 
 %changelog
+* Thu Jan  9 2015 Steve Milner <stevem@gnulinux.net> - 0.0.4-2
+- Fix for CTask query.
+- Removed unicode from CTask post.
+
 * Thu Jan  8 2015 Steve Milner <stevem@gnulinux.net> - 0.0.4-1
 - Now can query and create CTasks.
 
